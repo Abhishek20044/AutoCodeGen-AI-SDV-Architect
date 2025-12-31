@@ -1,0 +1,5 @@
+{
+  "name": "AutoCodeGen AI: SDV Architect",
+  "description": "A cutting-edge platform using GenAI to accelerate Software-Defined Vehicle development. Generate safety-compliant SoA code, requirements, and test cases for automotive systems with simulated validation.",
+  "requestFramePermissions": []
+}
