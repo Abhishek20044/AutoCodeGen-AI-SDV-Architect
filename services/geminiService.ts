@@ -2,28 +2,41 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GeneratedAsset } from "../types";
 
+/**
+ * Enhanced Gemini Service for Automotive SoA Generation.
+ * This function acts as the core "backend" logic, leveraging Gemini 3 Pro
+ * with a deep reasoning budget to ensure safety-critical code quality.
+ */
 export const generateAutomotiveSoA = async (prompt: string): Promise<GeneratedAsset> => {
-  // Always create a new instance inside the function as per best practices for up-to-date API keys
+  // Initialize AI client inside the call to ensure the latest API key is used
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+
+  const systemInstruction = `You are a world-class Senior Automotive Systems Architect and Safety Engineer (ISO 26262 expert).
+Your specialty is Software-Defined Vehicles (SDV) and Service-Oriented Architectures (SoA).
+
+When generating content:
+1. Adhere strictly to ISO 26262 ASIL-D requirements.
+2. For C++, follow MISRA C++:2023 and AUTOSAR Adaptive guidelines (ara::com).
+3. For Rust, utilize safety-critical patterns and the 'no_std' environment where applicable for embedded targets.
+4. Architecture should assume a modern middleware like Zenoh, DDS, or SOME/IP.
+5. UML diagrams must be syntactically perfect Mermaid.js code.
+6. Requirements must follow the EARS (Easy Approach to Requirements Syntax) patterns.
+
+Reason deeply about the safety implications, potential race conditions in distributed vehicle services, and memory safety before providing the final architecture and code.`;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Generate a complete automotive Service-Oriented Architecture (SoA) asset for the following feature: "${prompt}". 
-      The output must comply with ISO 26262 and MISRA standards. 
-      Include:
-      1. Detailed functional and safety requirements.
-      2. Architectural system design.
-      3. A DETAILED Mermaid.js Class Diagram. 
-         - Use visibility modifiers: + (public), - (private), # (protected).
-         - Include attribute types (e.g., -speed: float).
-         - Include full method signatures with parameters and return types (e.g., +calculateBrakingForce(distance: float): float).
-         - Show relationships like inheritance, composition, and dependency.
-      4. A Mermaid.js Sequence Diagram representing the message/signal flow between services.
-      5. Production-ready source code (C++ and Rust).
-      6. Test cases.
-      7. Mock simulation metrics.`,
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: `Generate a comprehensive automotive SoA asset bundle for: "${prompt}"` }]
+        }
+      ],
       config: {
+        systemInstruction: systemInstruction,
+        // Using a high thinking budget for complex architectural and safety reasoning
+        thinkingConfig: { thinkingBudget: 32768 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -31,47 +44,56 @@ export const generateAutomotiveSoA = async (prompt: string): Promise<GeneratedAs
             requirements: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "Detailed functional and safety requirements."
+              description: "List of functional, safety, and non-functional requirements in EARS syntax."
             },
             systemDesign: {
               type: Type.STRING,
-              description: "High-level architectural description."
+              description: "Detailed description of the service-oriented design, middleware selection, and safety concept."
             },
             classDiagram: {
               type: Type.STRING,
-              description: "Mermaid-formatted detailed class diagram string."
+              description: "Mermaid.js class diagram including visibility, types, and method signatures."
             },
             sequenceDiagram: {
               type: Type.STRING,
-              description: "Mermaid-formatted sequence diagram string."
+              description: "Mermaid.js sequence diagram showing service discovery and data exchange (e.g., Some/IP or DDS)."
             },
             sourceCode: {
               type: Type.OBJECT,
               properties: {
-                cpp: { type: Type.STRING, description: "MISRA-compliant C++ code." },
-                rust: { type: Type.STRING, description: "Safety-critical Rust code." },
-                java: { type: Type.STRING, description: "Android Automotive compatible Java code." }
+                cpp: { 
+                  type: Type.STRING, 
+                  description: "C++ implementation using Adaptive AUTOSAR (ara::com) or a modern SoA framework." 
+                },
+                rust: { 
+                  type: Type.STRING, 
+                  description: "Memory-safe Rust implementation for the high-integrity service component." 
+                },
+                java: { 
+                  type: Type.STRING, 
+                  description: "Java/Kotlin implementation for Android Automotive (AAOS) integration." 
+                }
               },
               required: ["cpp", "rust", "java"]
             },
             testCases: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "Unit and integration test scenarios."
+              description: "Requirements-based test cases for SIL (Software-in-the-Loop) validation."
             },
             complianceScore: {
               type: Type.NUMBER,
-              description: "A score from 0-100 indicating standard compliance."
+              description: "Calculated compliance percentage based on ISO 26262 and MISRA."
             },
             standardsCompliance: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "List of standards the code adheres to."
+              description: "Detailed list of applied standards (e.g., ISO 26262-6, MISRA C++:2023)."
             },
             simData: {
               type: Type.OBJECT,
               properties: {
-                status: { type: Type.STRING },
+                status: { type: Type.STRING, description: "Simulation verdict: 'success' or 'failure'." },
                 metrics: {
                   type: Type.ARRAY,
                   items: {
@@ -104,14 +126,27 @@ export const generateAutomotiveSoA = async (prompt: string): Promise<GeneratedAs
 
     const text = response.text;
     if (!text) {
-      throw new Error("The model returned an empty response.");
+      throw new Error("The AI backend returned an empty response. This may be due to safety filters or token limits.");
     }
 
-    // Clean potential markdown formatting from the response
+    // Clean potential markdown artifacts
     const cleanedText = text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
-    return JSON.parse(cleanedText);
+    const result = JSON.parse(cleanedText);
+
+    // Basic validation of the parsed object
+    if (!result.sourceCode || !result.classDiagram) {
+      throw new Error("The generated asset is incomplete. Retrying might improve the result.");
+    }
+
+    return result;
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    throw new Error(error.message || "Failed to generate automotive assets. Please try again.");
+    console.error("Backend logic error in Gemini Service:", error);
+    
+    // Provide user-friendly messaging for common API errors
+    if (error.message?.includes('429')) {
+      throw new Error("Rate limit exceeded. Please wait a moment before synthesizing new software.");
+    }
+    
+    throw new Error(error.message || "A critical error occurred while communicating with the AI backend.");
   }
 };
