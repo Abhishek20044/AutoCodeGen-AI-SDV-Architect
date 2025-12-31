@@ -192,25 +192,3 @@ npm run dev -- --port 3000
 ```
 
 ---
-
-## 7. Perfect Use Case for You
-
-Given your background in:
-
-* Web development
-* GenAI
-* SDV / Automotive case studies
-
-👉 This app is **ideal for hackathons, academic demos, and interviews**.
-
----
-
-If you want, I can:
-
-* Add **CARLA integration**
-* Convert this into a **desktop app**
-* Add **code generation for C++ / AUTOSAR**
-* Create **test-case generation**
-
-Just tell me 👍
-
