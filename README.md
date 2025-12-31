@@ -60,7 +60,7 @@ AutoCodeGen-AI-SDV-Architect-main/
 
 ---
 
-## 4. How to Run This App in VS Code (Step-by-Step)
+## 4. How to Run This App (Step-by-Step)
 
 ### Step 1: Extract the ZIP
 
